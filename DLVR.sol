@@ -1,3 +1,13 @@
+/**
+  
+   #Deliver features:
+   10% tax on buy/sell/transfer.
+   4% tax is distributed proportionally to all holders.
+   2% tax for marketing.
+   4% tax for dev and ops.
+
+ */
+
 pragma solidity 0.8.13;
 // SPDX-License-Identifier: MIT
 interface IERC20 {
@@ -443,83 +453,7 @@ interface IUniswapV2Factory {
     function setFeeToSetter(address) external;
 }
 
-abstract contract Pausable is Context {
-    /**
-     * @dev Emitted when the pause is triggered by `account`.
-     */
-    event Paused(address account);
-
-    /**
-     * @dev Emitted when the pause is lifted by `account`.
-     */
-    event Unpaused(address account);
-
-    bool private _paused;
-
-    /**
-     * @dev Initializes the contract in unpaused state.
-     */
-    constructor () {
-        _paused = false;
-    }
-
-    /**
-     * @dev Returns true if the contract is paused, and false otherwise.
-     */
-    function paused() public view virtual returns (bool) {
-        return _paused;
-    }
-
-    /**
-     * @dev Modifier to make a function callable only when the contract is not paused.
-     *
-     * Requirements:
-     *
-     * - The contract must not be paused.
-     */
-    modifier whenNotPaused() {
-        require(!paused(), "Pausable: paused");
-        _;
-    }
-
-    /**
-     * @dev Modifier to make a function callable only when the contract is paused.
-     *
-     * Requirements:
-     *
-     * - The contract must be paused.
-     */
-    modifier whenPaused() {
-        require(paused(), "Pausable: not paused");
-        _;
-    }
-
-    /**
-     * @dev Triggers stopped state.
-     *
-     * Requirements:
-     *
-     * - The contract must not be paused.
-     */
-    function _pause() internal virtual whenNotPaused {
-        _paused = true;
-        emit Paused(_msgSender());
-    }
-
-    /**
-     * @dev Returns to normal state.
-     *
-     * Requirements:
-     *
-     * - The contract must be paused.
-     */
-    function _unpause() internal virtual whenPaused {
-        _paused = false;
-        emit Unpaused(_msgSender());
-    }
-}
-
-contract DLVR is Context, IERC20, Pausable, Ownable {
+contract DLVR is Context, IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
@@ -528,8 +462,6 @@ contract DLVR is Context, IERC20, Pausable, Ownable {
     mapping (address => mapping (address => uint256)) private _allowances;
 
     mapping (address => bool) private _isExcludedFromFee;
-    mapping (address => bool) private _isBlacklisted;
-
 
     mapping (address => bool) private _isExcluded;
     address[] private _excluded;
@@ -539,7 +471,7 @@ contract DLVR is Context, IERC20, Pausable, Ownable {
     uint256 private _rTotal = (MAX - (MAX % _tTotal));
     uint256 private _tFeeTotal;
 
-    string private _name = "DLVR";
+    string private _name = "Deliver";
     string private _symbol = "DLVR";
     uint8 private _decimals = 18;
     
@@ -547,7 +479,7 @@ contract DLVR is Context, IERC20, Pausable, Ownable {
     uint256 private _previousTaxFee = _taxFee;
 
     uint256 public _marketingFee = 2;
-    uint256 private _previousMarketingFee = _taxFee;
+    uint256 private _previousMarketingFee = _marketingFee;
 
     uint256 public _developerFee = 4;
     uint256 private _previousDeveloperFee = _developerFee;
@@ -683,22 +615,9 @@ contract DLVR is Context, IERC20, Pausable, Ownable {
         _isExcludedFromFee[account] = false;
     }
 
-    function excludeFromBlacklist(address account) public onlyOwner {
-        _isBlacklisted[account] = false;
-    }
-    
-    function includeInBlacklist(address account) public onlyOwner {
-        _isBlacklisted[account] = true;
-    }
-
     function setTaxFeePercent(uint256 taxFee) external onlyOwner() {
+        require(taxFee <= 25);
         _taxFee = taxFee;
-    }
-   
-    function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner() {
-        _maxTxAmount = _tTotal.mul(maxTxPercent).div(
-            10**2
-        );
     }
     
      //to recieve ETH from uniswapV2Router when swaping
@@ -813,9 +732,6 @@ contract DLVR is Context, IERC20, Pausable, Ownable {
         return _isExcludedFromFee[account];
     }
 
-    function isBlacklisted(address account) public view returns(bool) {
-        return _isBlacklisted[account];
-    }
 
     function _approve(address owner, address spender, uint256 amount) private {
         require(owner != address(0), "ERC20: approve from the zero address");
@@ -833,8 +749,6 @@ contract DLVR is Context, IERC20, Pausable, Ownable {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
-        require(!paused(), "ERC20Pausable: token transfer while paused");
-        require(!isBlacklisted(from) && !isBlacklisted(to), "Transfer from or to blacklisted address");
 
         if (from != owner() && to != owner())
             require(amount <= _maxTxAmount, "Transfer amount exceeds the maxTxAmount.");
@@ -914,13 +828,5 @@ contract DLVR is Context, IERC20, Pausable, Ownable {
         _takeDeveloper(tDeveloper);
         _reflectFee(rFee, tFee);
         emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    function pause() public virtual onlyOwner {
-        _pause();
-    }
-
-    function unpause() public virtual onlyOwner {
-        _unpause();
     }
 }
